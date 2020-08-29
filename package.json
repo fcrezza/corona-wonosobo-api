@@ -1,0 +1,23 @@
+{
+  "name": "corona-wonosobo-api",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {},
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.3",
+    "node-fetch": "^2.6.0"
+  },
+  "devDependencies": {
+    "prettier": "^2.1.1"
+  },
+  "prettier": {
+    "semi": false,
+    "singleQuotes": true,
+    "trailingComma": "none",
+    "bracketSpacing": false
+  }
+}
