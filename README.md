@@ -16,7 +16,8 @@ Web scrapping COVID-19 data in Wonosobo, source from [ https://corona.wonosoboka
 
  1. Clone the repository
     ```git clone https://github.com/fcrezza/corona-wonosobo-api.git```
- 2. install project dependecies using:
+ 2. Install project dependecies using:
     ```npm install``` or ```yarn```
- 3. install [vercel](https://vercel.com/download) and login to vercel through [vercel CLI](https://vercel.com/docs/cli#commands/login). 
- 4. run ```vercel dev``` to run project on development mode, or ```vercel``` to deploy the project
+ 3. Install [vercel](https://vercel.com/download) and login to vercel through [vercel CLI](https://vercel.com/docs/cli#commands/login) 
+ 4. Run ```vercel dev``` to run project on development mode, or ```vercel``` to deploy the project
+ 5. If you using chrome install [JSON formatter](https://chrome.google.com/webstore/detail/bcjindcccaagfpapjjmafapmmgkkhgoa), to get readable response (this step is optional)
