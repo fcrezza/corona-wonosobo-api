@@ -1,6 +1,8 @@
 const fetch = require("node-fetch")
 const $ = require("cheerio")
 
+const baseUrl = "https://coronawonosobo-api.fcrezza.com/api"
+
 export async function getHtml() {
 	const data = await fetch("https://corona.wonosobokab.go.id/")
 	const dataHtml = await data.text()
@@ -26,7 +28,7 @@ export function getMainData(html) {
 	Array.of("odr", "odp", "pdp", "positive").forEach((name, i) => {
 		result[name] = {
 			value: parseInt(data[i].replace(",", "")),
-			detail: `/${name}`
+			detail: `${baseUrl}/${name}`
 		}
 	})
 
@@ -120,7 +122,7 @@ export function getRegions(html) {
 
 			obj[properties[i]] = $(td).text()
 		})
-		obj.detail = `/regions/${obj.name.toLowerCase().replace(" ", "")}`
+		obj.detail = `${baseUrl}/regions/${obj.name.toLowerCase().replace(" ", "")}`
 		result.push(obj)
 	})
 
