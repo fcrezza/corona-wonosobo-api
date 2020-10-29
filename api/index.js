@@ -1,12 +1,10 @@
-import { getHtml, getLastUpdate, getMainData } from "../util";
+import {getMainData} from "../util";
 
 export default async (_, res) => {
-	const html = await getHtml();
-	const lastUpdate = getLastUpdate(html);
-	const mainData = getMainData(html);
-
-	res.json({
-		...mainData,
-		lastUpdate,
-	});
+  try {
+    const mainData = await getMainData();
+    res.json(mainData);
+  } catch (error) {
+    res.json(error);
+  }
 };

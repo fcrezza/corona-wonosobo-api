@@ -1,186 +1,154 @@
-const fetch = require("node-fetch")
-const $ = require("cheerio")
+import retry from "@vercel/fetch-retry";
+import fetch from "node-fetch";
+import $ from "cheerio";
+import rootCas from "ssl-root-cas/latest";
+import https from "https";
+import {join} from "path";
 
-const baseUrl = "https://coronawonosobo-api.fcrezza.com/api"
+const fetcher = retry(fetch);
+const baseUrl = "https://coronawonosobo-api.fcrezza.com/api";
+https.globalAgent.options.ca = rootCas.create();
+rootCas.addFile(join(__dirname, "/..", "/intermediate.pem"));
 
-export async function getHtml() {
-	const data = await fetch("https://corona.wonosobokab.go.id/")
-	const dataHtml = await data.text()
-	return dataHtml
+async function getPage() {
+  const sourceUrl = "https://corona.wonosobokab.go.id/";
+  const res = await fetcher(sourceUrl);
+  const page = await res.text();
+  return page;
 }
 
-export function getLastUpdate(html) {
-	const date = $("h2 .label.label-primary", html)
-		.slice(1, 2)
-		.text()
-		.split(" ")[1]
-	const parseDate = new Date(date.split("-").reverse().join("/"))
-	return parseDate
+function getDate(page) {
+  const text = $("center:nth-child(2) .label.label-primary", page).text();
+  const raw = text.split(" ")[1];
+  const parseDate = raw.split("-").reverse().join("/");
+  return parseDate;
 }
 
-export function getMainData(html) {
-	const result = {}
-	const container = $(".inner center", html)
-	const data = $("h2", container)
-		.map((_, e) => $(e).text())
-		.toArray()
+export async function getMainData() {
+  const page = await getPage();
+  const result = {};
+  const keys = ["odr", "suspect", "probable", "positive"];
+  const container = $(".inner center", page);
+  const data = $("h2", container).map((_, e) => $(e).text());
 
-	Array.of("odr", "odp", "pdp", "positive").forEach((name, i) => {
-		result[name] = {
-			value: parseInt(data[i].replace(",", "")),
-			detail: `${baseUrl}/${name}`
-		}
-	})
+  for (let idx = 0; idx < keys.length; idx++) {
+    result[keys[idx]] = {
+      value: Number(data[idx].replace(",", "")),
+      detail: `${baseUrl}/${keys[idx]}`
+    };
+  }
 
-	return result
+  result.lastUpdate = getDate(page);
+  return result;
 }
 
-export function getOdr(html) {
-	const container = $(".info-box-icon.bg-yellow", html).next()
-	const data = $("b", container)
-		.map((_, e) => $(e).text())
-		.toArray()
-	const total = $(".small-box.bg-yellow .inner h2", html).text()
-	return {
-		odp: parseInt(data[0].replace(",", ""), 10),
-		pdp: parseInt(data[1].replace(",", ""), 10),
-		total: parseInt(total.replace(",", ""), 10)
-	}
+export async function getDetail({containerSelector, keys, totalSelector}) {
+  const page = await getPage();
+  const container = $(containerSelector, page).next();
+  const data = $("b", container).map((_, e) => $(e).text());
+  const total = $(totalSelector, page).text();
+  const result = {};
+
+  for (let idx = 0; idx < keys.length; idx++) {
+    result[keys[idx]] = Number(data[idx].replace(",", ""));
+  }
+
+  result.total = Number(total.replace(",", ""));
+  result.lastUpdate = getDate(page);
+  return result;
 }
 
-export function getPdp(html) {
-	const container = $(".info-box-icon.bg-green", html).next()
-	const data = $("b", container)
-		.map((_, e) => $(e).text())
-		.toArray()
-	const result = {}
+export async function getRegions() {
+  const props = ["name", "odp", "pdp", "positive"];
+  const page = await getPage();
+  const rows = $("#accordion1", page).toArray();
+  const result = [];
+  rows.forEach((row) => {
+    const regions = {};
+    const tds = $("td:not(:first-child)", row).map((_, td) => $(td).text());
+    for (let idx = 0; idx < props.length; idx++) {
+      if (idx) {
+        regions[props[idx]] = Number(tds[idx].replace(",", ""));
+        continue;
+      }
 
-	Array.of("recovered", "death", "treated", "selfIsolation").forEach(
-		(name, i) => {
-			result[name] = parseInt(data[i].replace(",", ""), 10)
-		}
-	)
+      regions[props[idx]] = tds[idx].toLowerCase().replace(" ", "-");
+      regions.detail = `${baseUrl}/regions/${regions.name}`;
+      result.push(regions);
+    }
+  });
 
-	return {
-		...result,
-		total: data.reduce(
-			(acc, curr) => (acc += parseInt(curr.replace(",", ""), 10)),
-			0
-		)
-	}
+  return {
+    data: result,
+    lastUpdate: getDate(page)
+  };
 }
 
-export function getOdp(html) {
-	const container = $(".info-box-icon.bg-blue", html).next()
-	const data = $("b", container)
-		.map((_, e) => $(e).text())
-		.toArray()
+export async function getRegion(name) {
+  const page = await getPage();
+  const props = ["name", "positive", "recovered", "death"];
+  const tables = $("#container > #tableMain", page).toArray();
+  let rowIdx = 0;
+  const result = [];
 
-	return {
-		done: parseInt(data[0].replace(",", ""), 10),
-		ongoing: parseInt(data[1].replace(",", ""), 10),
-		total: data.reduce(
-			(acc, curr) => (acc += parseInt(curr.replace(",", ""), 10)),
-			0
-		)
-	}
-}
+  for (let idx = 0; idx < tables.length; idx++) {
+    const regionName = $("td:nth-child(2)", tables[idx])
+      .text()
+      .toLowerCase()
+      .replace(" ", "-");
 
-export function getPositive(html) {
-	const container = $(".info-box-icon.bg-red", html).next()
-	const data = $("b", container)
-		.map((_, e) => $(e).text())
-		.toArray()
-	const result = {}
+    if (regionName === name) {
+      rowIdx = idx;
+      break;
+    }
+  }
 
-	Array.of("recovered", "death", "treated").forEach((name, i) => {
-		result[name] = parseInt(data[i].replace(",", ""), 10)
-	})
+  if (!rowIdx) {
+    return {
+      data: null
+    };
+  }
 
-	return {
-		...result,
-		total: data.reduce(
-			(acc, curr) => (acc += parseInt(curr.replace(",", ""), 10)),
-			0
-		)
-	}
-}
+  const container = $(tables[rowIdx]).next(".collapse");
+  if (container.length) {
+    const rows = $("tr:nth-child(even)", container).toArray();
+    rows.forEach((row) => {
+      const tds = $("td:not(:first-child)", row).map((_, td) => $(td).text());
+      const region = {};
+      for (let idx = 0; idx < props.length; idx++) {
+        if (idx) {
+          region[props[idx]] = Number(tds[idx].replace(",", ""));
+          continue;
+        }
 
-export function getRegions(html) {
-	const result = []
-	const properties = Array.of("name", "odp", "pdp", "positive")
-	const table = $("#container > #tableMain tr", html).toArray().slice(1)
-	const data = table.map((t) => $("td", t).slice(1).toArray())
+        region[props[idx]] = tds[idx].toLowerCase().replace(" ", "");
+      }
+      result.push(region);
+    });
 
-	data.forEach((d) => {
-		const obj = {}
-		d.forEach((td, i) => {
-			if (i) {
-				obj[properties[i]] = parseInt($(td).text().replace(",", ""), 10)
-				return
-			}
+    return {
+      data: result,
+      lastUpdate: getDate(page)
+    };
+  }
 
-			obj[properties[i]] = $(td).text()
-		})
-		obj.detail = `${baseUrl}/regions/${obj.name.toLowerCase().replace(" ", "")}`
-		result.push(obj)
-	})
+  const region = {};
+  const tds = $("td:not(:first-child)", tables[rowIdx]).map((_, td) =>
+    $(td).text()
+  );
 
-	return result
-}
+  for (let idx = 0; idx < props.length; idx++) {
+    if (idx) {
+      region[props[idx]] = Number(tds[idx].replace(",", ""));
+      continue;
+    }
 
-export function getRegion(html, name) {
-	const result = []
-	let idx = 0
-	const properties = Array.of("name", "odp", "pdp", "positive")
-	const tables = $("#container > #tableMain", html)
+    region[props[idx]] = tds[idx].toLowerCase().replace(" ", "-");
+  }
 
-	tables.each((i, t) => {
-		const regionName = $("td", t)
-			.slice(1, 2)
-			.text()
-			.toLowerCase()
-			.replace(" ", "")
-		if (regionName === name) {
-			idx = i
-			return
-		}
-	})
-
-	if (!idx) {
-		return null
-	}
-
-	if (!$(tables.toArray()[idx]).next().hasClass("collapse") && idx === 16) {
-		const td = $("td", tables.toArray()[idx]).toArray().slice(1)
-		const obj = {}
-		td.forEach((d, i) => {
-			if (i) {
-				obj[properties[i]] = parseInt($(d).text().replace(",", ""), 10)
-				return
-			}
-
-			obj[properties[i]] = $(d).text()
-		})
-		result.push(obj)
-		return result
-	}
-
-	const container = $(tables.toArray()[idx]).next(".collapse")
-	const tr = $("tr", container).filter((_, el) => $(el).children().length && el)
-	const data = tr.toArray().map((el) => $(el).children().slice(1).toArray())
-	data.forEach((d) => {
-		const obj = {}
-		d.forEach((td, i) => {
-			if (i) {
-				obj[properties[i]] = parseInt($(td).text().replace(",", ""), 10)
-				return
-			}
-
-			obj[properties[i]] = $(td).text()
-		})
-		result.push(obj)
-	})
-
-	return result
+  result.push(region);
+  return {
+    data: result,
+    lastUpdate: getDate(page)
+  };
 }

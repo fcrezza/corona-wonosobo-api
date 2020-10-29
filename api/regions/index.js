@@ -1,11 +1,10 @@
-import {getHtml, getRegions, getLastUpdate} from "../../util"
+import {getRegions} from "../../util";
 
 export default async (_, res) => {
-	const html = await getHtml()
-	const lastUpdate = getLastUpdate(html)
-	const regions = getRegions(html)
-	res.json({
-		values: regions,
-		lastUpdate
-	})
-}
+  try {
+    const regions = await getRegions();
+    res.json(regions);
+  } catch (error) {
+    res.json(error);
+  }
+};

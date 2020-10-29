@@ -1,11 +1,14 @@
-import { getHtml, getLastUpdate, getOdr } from "../util";
+import {getDetail} from "../util";
 
 export default async (_, res) => {
-	const html = await getHtml();
-	const lastUpdate = getLastUpdate(html);
-	const odr = getOdr(html);
-	res.json({
-		...odr,
-		lastUpdate,
-	});
+  try {
+    const odr = await getDetail({
+      containerSelector: ".info-box-icon.bg-yellow",
+      totalSelector: ".small-box.bg-yellow .inner h2",
+      keys: ["suspect", "probable"]
+    });
+    res.json(odr);
+  } catch (error) {
+    res.json(error);
+  }
 };

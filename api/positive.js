@@ -1,11 +1,14 @@
-import { getHtml, getLastUpdate, getPositive } from "../util";
+import {getDetail} from "../util";
 
 export default async (_, res) => {
-	const html = await getHtml();
-	const lastUpdate = getLastUpdate(html);
-	const positive = getPositive(html);
-	res.json({
-		...positive,
-		lastUpdate,
-	});
+  try {
+    const positive = await getDetail({
+      containerSelector: ".info-box-icon.bg-red",
+      totalSelector: ".small-box.bg-red .inner h2",
+      keys: ["recovered", "death", "treated"]
+    });
+    res.json(positive);
+  } catch (error) {
+    res.json(error);
+  }
 };
